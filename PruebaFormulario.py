@@ -1,19 +1,24 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import mysql.connector
 
 app = FastAPI()
 
-# --- 1️⃣ Permitir CORS (para que Power Apps/BI puedan acceder) ---
+# --- Permitir CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # puedes restringir luego
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 2️⃣ Conexión con MySQL ---
+# --- Modelo de datos esperado ---
+class Dato(BaseModel):
+    nombre: str
+    valor: float
+
+# --- Conexión MySQL ---
 def get_db_connection():
     return mysql.connector.connect(
         host="34.247.119.184",
@@ -22,26 +27,22 @@ def get_db_connection():
         database="BI_FEEDBACK"
     )
 
-# --- 3️⃣ Endpoint de prueba ---
+# --- Endpoint de prueba ---
 @app.get("/")
 def root():
     return {"status": "ok", "message": "API corriendo correctamente"}
 
-# --- 4️⃣ Endpoint para recibir datos de Power Apps ---
+# --- Endpoint para insertar datos ---
 @app.post("/insertar_dato")
-async def insertar_dato(request: Request):
-    data = await request.json()
-    nombre = data.get("nombre")
-    valor = data.get("valor")
-
+async def insertar_dato(dato: Dato):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     sql = "INSERT INTO tabla_pruebas (nombre, valor) VALUES (%s, %s)"
-    cursor.execute(sql, (nombre, valor))
+    cursor.execute(sql, (dato.nombre, dato.valor))
     conn.commit()
 
     cursor.close()
     conn.close()
 
-    return {"status": "ok", "mensaje": f"Dato insertado correctamente: {nombre}"}
+    return {"status": "ok", "mensaje": f"Dato insertado correctamente: {dato.nombre}"}
